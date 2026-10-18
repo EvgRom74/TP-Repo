@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Network Quiz</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f172a);
+      --card-bg: var(--tg-theme-secondary-bg-color, #1e293b);
+      --text: var(--tg-theme-text-color, #f8fafc);
+      --hint: var(--tg-theme-hint-color, #94a3b8);
+      --btn: var(--tg-theme-button-color, #38bdf8);
+      --btn-text: var(--tg-theme-button-text-color, #0f172a);
+      --success: #22c55e;
+      --error: #ef4444;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 16px; min-height: 100vh; display: flex; flex-direction: column; }
+    .container { width: 100%; max-width: 520px; margin: 0 auto; flex: 1; display: flex; flex-direction: column; }
+
+    .card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+    h1 { font-size: 22px; margin-bottom: 6px; font-weight: 700; text-align: center; }
+    p.subtitle { color: var(--hint); font-size: 13px; text-align: center; margin-bottom: 20px; }
+
+    .section-title { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--hint); margin: 16px 0 10px; }
+    
+    .topics-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 4px; }
+    .topic-item { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; }
+    .topic-item input { accent-color: var(--btn); width: 16px; height: 16px; }
+
+    .count-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+    .btn-count { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text); padding: 10px 0; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-count.active { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
+
+    .primary-btn { width: 100%; background: var(--btn); color: var(--btn-text); border: none; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: auto; }
+    
+    /* Quiz View */
+    .progress-bar-wrap { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 16px; }
+    .progress-bar-fill { height: 100%; width: 0%; background: var(--btn); transition: width 0.3s; }
+    .badge { display: inline-block; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.15); color: var(--btn); font-weight: 600; margin-bottom: 12px; }
+    .question-text { font-size: 17px; line-height: 1.4; font-weight: 600; margin-bottom: 20px; }
+    
+    .options { display: flex; flex-direction: column; gap: 10px; }
+    .option-btn { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text); padding: 12px 14px; border-radius: 10px; font-size: 14px; text-align: left; cursor: pointer; transition: 0.15s; }
+    .option-btn.correct { background: rgba(34, 197, 94, 0.15); border-color: var(--success); color: var(--success); font-weight: 600; }
+    .option-btn.wrong { background: rgba(239, 68, 68, 0.15); border-color: var(--error); color: var(--error); font-weight: 600; }
+    .option-btn:disabled { cursor: default; }
+
+    .explanation-box { margin-top: 16px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 10px; border-left: 3px solid var(--btn); font-size: 13px; line-height: 1.4; color: var(--hint); display: none; }
+
+    /* Result View */
+    .result-card { text-align: center; padding: 30px 20px; }
+    .score-circle { width: 100px; height: 100px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 3px solid var(--btn); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: var(--btn); }
+    .result-title { font-size: 20px; margin-bottom: 8px; }
+    .result-desc { font-size: 14px; color: var(--hint); margin-bottom: 24px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- ЭКРАН 1: НАСТРОЙКИ -->
+    <div id="screen-setup" class="card">
+      <h1>Сетевой тренажер</h1>
+      <p class="subtitle">База из 230 вопросов по конспекту Д. Скоромнова</p>
+
+      <div class="section-title">Количество вопросов</div>
+      <div class="count-grid">
+        <button class="btn-count" onclick="setCount(5)">5</button>
+        <button class="btn-count active" onclick="setCount(10)">10</button>
+        <button class="btn-count" onclick="setCount(20)">20</button>
+        <button class="btn-count" onclick="setCount(30)">30</button>
+      </div>
+
+      <div class="section-title">Темы для проверки</div>
+      <div class="topics-list" id="topics-list"></div>
+
+      <button class="primary-btn" onclick="startQuiz()" style="margin-top: 20px;">Начать тестирование</button>
+    </div>
+
+    <!-- ЭКРАН 2: ТЕСТИРОВАНИЕ -->
+    <div id="screen-quiz" class="card" style="display: none;">
+      <div class="progress-bar-wrap">
+        <div id="progress-bar" class="progress-bar-fill"></div>
+      </div>
+      <div>
+        <span id="topic-badge" class="badge">Тема</span>
+        <span id="q-counter" style="float: right; font-size: 12px; color: var(--hint);">1 / 10</span>
+      </div>
+      <div id="question-text" class="question-text">Текст вопроса</div>
+      <div id="options-list" class="options"></div>
+      <div id="explanation-box" class="explanation-box"></div>
+      <button id="next-btn" class="primary-btn" onclick="nextQuestion()" style="display: none; margin-top: 16px;">Следующий вопрос</button>
+    </div>
+
+    <!-- ЭКРАН 3: РЕЗУЛЬТАТ -->
+    <div id="screen-result" class="card result-card" style="display: none;">
+      <div id="score-circle" class="score-circle">80%</div>
+      <h2 id="result-title" class="result-title">Отличный результат!</h2>
+      <p id="result-desc" class="result-desc">Вы ответили правильно на 8 из 10 вопросов.</p>
+      <button class="primary-btn" onclick="resetQuiz()">Пройти еще раз</button>
+    </div>
+
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) { tg.ready(); tg.expand(); }
+
+    let allQuestions = [];
+    let activeQueue = [];
+    let currentIndex = 0;
+    let score = 0;
+    let selectedCount = 10;
+
+    // Загрузка вопросов из локального questions.json
+    fetch('questions.json')
+      .then(res => res.json())
+      .then(data => {
+        allQuestions = data;
+        renderTopics();
+      })
+      .catch(err => alert("Ошибка загрузки questions.json"));
+
+    function renderTopics() {
+      const container = document.getElementById('topics-list');
+      const unique = {};
+      allQuestions.forEach(q => {
+        if (!unique[q.topic_id]) unique[q.topic_id] = { title: q.topic_title, count: 0 };
+        unique[q.topic_id].count++;
+      });
+
+      let html = `
+        <label class="topic-item" style="font-weight: 600;">
+          <input type="checkbox" id="topic-all" checked onchange="toggleAllTopics(this)">
+          <span>Все темы сразу (${allQuestions.length} вопр.)</span>
+        </label>
+      `;
+
+      for (let id in unique) {
+        html += `
+          <label class="topic-item">
+            <input type="checkbox" class="topic-cb" value="${id}" checked onchange="checkAllState()">
+            <span>${unique[id].title} <small style="color:var(--hint)">(${unique[id].count})</small></span>
+          </label>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function toggleAllTopics(master) {
+      document.querySelectorAll('.topic-cb').forEach(cb => cb.checked = master.checked);
+    }
+
+    function checkAllState() {
+      const cbs = Array.from(document.querySelectorAll('.topic-cb'));
+      document.getElementById('topic-all').checked = cbs.every(cb => cb.checked);
+    }
+
+    function setCount(num) {
+      selectedCount = num;
+      document.querySelectorAll('.btn-count').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+
+    function startQuiz() {
+      const selectedTopics = Array.from(document.querySelectorAll('.topic-cb:checked')).map(cb => cb.value);
+      if (selectedTopics.length === 0) {
+        alert("Выберите хотя бы одну тему!");
+        return;
+      }
+
+      const filtered = allQuestions.filter(q => selectedTopics.includes(q.topic_id));
+      activeQueue = filtered.sort(() => 0.5 - Math.random()).slice(0, selectedCount);
+
+      currentIndex = 0;
+      score = 0;
+
+      document.getElementById('screen-setup').style.display = 'none';
+      document.getElementById('screen-result').style.display = 'none';
+      document.getElementById('screen-quiz').style.display = 'block';
+
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      const q = activeQueue[currentIndex];
+      document.getElementById('topic-badge').innerText = q.topic_title;
+      document.getElementById('q-counter').innerText = `${currentIndex + 1} / ${activeQueue.length}`;
+      document.getElementById('progress-bar').style.width = `${((currentIndex) / activeQueue.length) * 100}%`;
+      document.getElementById('question-text').innerText = q.question;
+      
+      const optContainer = document.getElementById('options-list');
+      optContainer.innerHTML = '';
+
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerText = opt;
+        btn.onclick = () => selectOption(idx);
+        optContainer.appendChild(btn);
+      });
+
+      document.getElementById('explanation-box').style.display = 'none';
+      document.getElementById('next-btn').style.display = 'none';
+    }
+
+    function selectOption(index) {
+      const q = activeQueue[currentIndex];
+      const buttons = document.querySelectorAll('.option-btn');
+      buttons.forEach(b => b.disabled = true);
+
+      if (index === q.correct_option_id) {
+        buttons[index].classList.add('correct');
+        score++;
+      } else {
+        buttons[index].classList.add('wrong');
+        buttons[q.correct_option_id].classList.add('correct');
+      }
+
+      const exp = document.getElementById('explanation-box');
+      exp.innerHTML = `<strong>Объяснение:</strong> ${q.explanation}`;
+      exp.style.display = 'block';
+
+      document.getElementById('next-btn').style.display = 'block';
+    }
+
+    function nextQuestion() {
+      currentIndex++;
+      if (currentIndex < activeQueue.length) {
+        loadQuestion();
+      } else {
+        showResults();
+      }
+    }
+
+    function showResults() {
+      document.getElementById('screen-quiz').style.display = 'none';
+      document.getElementById('screen-result').style.display = 'block';
+
+      const pct = Math.round((score / activeQueue.length) * 100);
+      document.getElementById('score-circle').innerText = `${pct}%`;
+
+      const title = document.getElementById('result-title');
+      const desc = document.getElementById('result-desc');
+
+      if (pct >= 80) title.innerText = "Отличный результат! 🔥";
+      else if (pct >= 50) title.innerText = "Хорошая попытка! 👍";
+      else title.innerText = "Стоит подучить конспект 📚";
+
+      desc.innerText = `Вы правильно ответили на ${score} из ${activeQueue.length} вопросов.`;
+    }
+
+    function resetQuiz() {
+      document.getElementById('screen-result').style.display = 'none';
+      document.getElementById('screen-setup').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
